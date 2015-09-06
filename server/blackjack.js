@@ -4,60 +4,8 @@ var fs = require('fs');
 var DIR = __dirname+'/..';
 var PORT = 3000;
 
-// basic Fisher-Yate in-place shuffle function
-function shuffle(arr) {
-  var cI = arr.length, tV, rI;
-  while (0 !== cI) {
-    rI = Math.floor(Math.random() * cI);
-    cI--;
-    tV = arr[cI];
-    arr[cI] = arr[rI];
-    arr[rI] = tV;
-  }
-  return arr;
-}
-
-// make deck of cards
-// supporting multiple decks now!
-// _ALWAYS_ returns shuffled
-var getDeck = function(size) {
-  size = size || 1; //assume 1 deck
-  size *= 52;
-  var deck = [];
-  var card = {};
-  for (var i=0;i<size;i++) {
-    card.value = i;
-    card.rank = i%13;
-    card.suit = (i/13)|0;
-    deck.push(makeCard(card));
-  }
-  return shuffle(deck);
-}
-
-// this mimics the Card model on the client
-// even the awkward naming :-D
-var makeCard = function(params) {
-  var ret = {};
-  ret.revealed = true;
-  ret.suitName = ['Spades','Diamonds','Clubs','Hearts'][params.suit];
-  ret.rankName = params.rank;
-  if (params.rank === 0) {
-    ret.rankName = 'King';
-  }
-  if (params.rank === 1) {
-    ret.rankName = 'Ace';
-  }
-  if (params.rank === 11) {
-    ret.rankName = 'Jack';
-  }
-  if (params.rank === 12) {
-    ret.rankName = 'Queen';
-  }
-  ret.rank = params.rank;
-  ret.suit = params.suit;
-  ret.value = params.value;
-  return ret;
-};
+var Deck = require('./deck');
+var NUM_DECKS = 2;
 
 // get blackjack score given a hand (array) of ^^ cards ^^
 var handScore = function(cards) {
@@ -95,7 +43,9 @@ server.listen(PORT);
 
 
 // Use these vars inside the connection
-var deck,dealer,player;
+var deck = new Deck(NUM_DECKS);
+deck.shuffle();
+var dealer,player;
 var socket = io.listen(server);
 socket.on('connection', function(client) {
 
@@ -104,13 +54,18 @@ socket.on('connection', function(client) {
   // Also differentiate between next deal (same deck) and
   // new deal (start or fresh deck)
   client.on('deal', function() {
-    // get shuffled deck
-    deck = getDeck();
+    // if remaining cards in deck<50%
+    console.log('Cards remaining: '+deck.cardCount);
+    if (deck.cardCount<(deck.size*deck.cardsInDeck)/2) {
+      deck.makeDeck();
+      deck.shuffle();
+      console.log('Shuffling!');
+    }
 
     // set starting cards
-    dealer = [deck.pop(),deck.pop()];
+    dealer = deck.deal(2);
     dealer[0].revealed = false;
-    player = [deck.pop(),deck.pop()];
+    player = deck.deal(2);
 
     console.log('Dealing!');
     if (handScore(player)===21) console.log('Player won!');
@@ -139,6 +94,7 @@ socket.on('connection', function(client) {
       console.log('Dealer wins!');
     } else {
       while (dealerScore<17) {
+        console.log('Dealer hits!');
         dealer.push(deck.pop());
         socket.emit('dealerHit',dealer[dealer.length-1]);
         dealerScore = handScore(dealer);
