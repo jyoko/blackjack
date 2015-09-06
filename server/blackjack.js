@@ -81,7 +81,8 @@ var handScore = function(cards) {
     if (card.rank===1) hasAce=1;
     return score + ((card.rank>10)?10:card.rank);
   },0);
-  return [score,score+(10*hasAce)];
+  var scores = [score,score+(10*hasAce)];
+  return (scores[1]<22)?scores[1]:scores[0];
 };
 
 var socket = io.listen(server);
@@ -105,9 +106,7 @@ socket.on('connection', function(client) {
   client.on('hitMe', function() {
     console.log('Player hit!');
     player.push(deck.pop());
-    var scores = handScore(player);
-    var score = (scores[1]<22)?scores[1]:scores[0];
-    console.log(score);
+    var score = handScore(player);
     if (score>21) {
       console.log('Player lost!');
     }
@@ -118,7 +117,27 @@ socket.on('connection', function(client) {
   });
 
   client.on('stand', function() {
-    // implement this
+    console.log('Player stays!');
+    var dealerScore = handScore(dealer);
+    var playerScore = handScore(player);
+    if (dealerScore>playerScore) {
+      console.log('Dealer wins!');
+    } else {
+      while (dealerScore<17) {
+        dealer.push(deck.pop());
+        dealerScore = handScore(dealer);
+      }
+      if (dealerScore>21) {
+        console.log('Dealer busts!');
+      } else if (dealerScore>playerScore) {
+        console.log('Dealer wins!');
+      } else if (dealerScore<playerScore) {
+        console.log('Player wins!');
+      } else if (dealerScore===playerScore) {
+        console.log('Push!');
+      }
+    }
+    // socket.emit(endgame)
   });
   client.on('disconnect',function() {
     //clearInterval(interval);
