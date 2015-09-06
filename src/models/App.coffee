@@ -13,8 +13,11 @@ class window.App extends Backbone.Model
     @socket.on('dealerCards', (data) =>
       @makeDealer(data)
     )
-    @socket.on('hitBack', (data) =>
+    @socket.on('playerHit', (data) =>
       @get('playerHand').getCard(data)
+    )
+    @socket.on('dealerHit', (data) =>
+      @get('dealerHand').getCard(data)
     )
     @deal()
 

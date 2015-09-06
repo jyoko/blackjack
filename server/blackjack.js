@@ -113,7 +113,7 @@ socket.on('connection', function(client) {
     if (score===21) {
       console.log('Player won!');
     }
-    socket.emit('hitBack',player[player.length-1]);
+    socket.emit('playerHit',player[player.length-1]);
   });
 
   client.on('stand', function() {
@@ -125,6 +125,7 @@ socket.on('connection', function(client) {
     } else {
       while (dealerScore<17) {
         dealer.push(deck.pop());
+        socket.emit('dealerHit',dealer[dealer.length-1]);
         dealerScore = handScore(dealer);
       }
       if (dealerScore>21) {

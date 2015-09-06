@@ -11,6 +11,7 @@ class window.Hand extends Backbone.Collection
     @add(new Card(card))
 
   stand: ->
+    @at(0).flip() if @isDealer?
     @socket.emit('stand')
 
   hasAce: -> @reduce (memo, card) ->
