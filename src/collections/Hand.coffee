@@ -1,10 +1,17 @@
 class window.Hand extends Backbone.Collection
   model: Card
 
-  initialize: (array, @deck, @isDealer) ->
+  initialize: (array, @isDealer) ->
+    @socket = window.socket
 
   hit: ->
-    @add(@deck.pop())
+    @socket.emit('hitMe')
+
+  getCard: (card) ->
+    @add(new Card(card))
+
+  stand: ->
+    @socket.emit('stand')
 
   hasAce: -> @reduce (memo, card) ->
     memo or card.get('value') is 1
