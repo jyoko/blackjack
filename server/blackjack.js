@@ -4,7 +4,7 @@ var fs = require('fs');
 var DIR = __dirname+'/..';
 var PORT = 3000;
 
-// basic shuffle function
+// basic Fisher-Yate in-place shuffle function
 function shuffle(arr) {
   var cI = arr.length, tV, rI;
   while (0 !== cI) {
@@ -17,26 +17,25 @@ function shuffle(arr) {
   return arr;
 }
 
-// expose mostly everything for easy access (only available to localhost ATM)
-function handleReq(req,res) {
-  var filePath = DIR+req.url;
-  if (filePath===DIR+'/') {
-    filePath+='index.html';
-  };
-  fs.readFile(filePath, function(err, data) {
-    if (err) {
-      res.writeHead(500);
-      return res.end('Error loading');
-    }
-
-    res.writeHead(200);
-    res.end(data);
-  });
+// make deck of cards
+// supporting multiple decks now!
+// _ALWAYS_ returns shuffled
+var getDeck = function(size) {
+  size = size || 1; //assume 1 deck
+  size *= 52;
+  var deck = [];
+  var card = {};
+  for (var i=0;i<size;i++) {
+    card.value = i;
+    card.rank = i%13;
+    card.suit = (i/13)|0;
+    deck.push(makeCard(card));
+  }
+  return shuffle(deck);
 }
 
-var server = http.createServer(handleReq);
-server.listen(PORT);
-
+// this mimics the Card model on the client
+// even the awkward naming :-D
 var makeCard = function(params) {
   var ret = {};
   ret.revealed = true;
@@ -60,35 +59,50 @@ var makeCard = function(params) {
   return ret;
 };
 
-// make deck of cards!
-var getDeck = function() {
-  var deck = [];
-  var card = {};
-  for (var i=0;i<52;i++) {
-    card.value = i;
-    card.rank = i%13;
-    card.suit = (i/13)|0;
-    deck.push(makeCard(card));
-  }
-  return shuffle(deck);
-}
-var deck,dealer,player;
-
-// get blackjack scores
+// get blackjack score given a hand (array) of ^^ cards ^^
 var handScore = function(cards) {
   var hasAce = 0;
   var score = cards.reduce(function(score,card) {
     if (card.rank===1) hasAce=1;
-    return score + ((card.rank>10)?10:card.rank);
+    return score + ((!card.rank || card.rank>10)?10:card.rank);
   },0);
   var scores = [score,score+(10*hasAce)];
+  // If there's an ace above then scores[1] is the high chance
+  // we default to that one until the hand is a bust, then use the lower
   return (scores[1]<22)?scores[1]:scores[0];
 };
 
-var socket = io.listen(server);
+// expose mostly everything for easy access (only available to localhost ATM)
+// don't put this live (AFAIK http doesn't block directory traversal)
+function handleReq(req,res) {
+  var filePath = DIR+req.url;
+  if (filePath===DIR+'/') {
+    filePath+='index.html';
+  };
+  fs.readFile(filePath, function(err, data) {
+    if (err) {
+      // every error returns 500 - oh well
+      res.writeHead(500);
+      return res.end('Error loading');
+    }
 
+    res.writeHead(200);
+    res.end(data);
+  });
+}
+var server = http.createServer(handleReq);
+server.listen(PORT);
+
+
+// Use these vars inside the connection
+var deck,dealer,player;
+var socket = io.listen(server);
 socket.on('connection', function(client) {
 
+  // Was using same deck, but irritating to run out of cards while testing
+  // should probably abstract the whole game out to a separate object
+  // Also differentiate between next deal (same deck) and
+  // new deal (start or fresh deck)
   client.on('deal', function() {
     // get shuffled deck
     deck = getDeck();
@@ -99,6 +113,7 @@ socket.on('connection', function(client) {
     player = [deck.pop(),deck.pop()];
 
     console.log('Dealing!');
+    if (handScore(player)===21) console.log('Player won!');
     socket.emit('playerCards',player);
     socket.emit('dealerCards',dealer);
   });
